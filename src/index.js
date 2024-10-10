@@ -5,8 +5,9 @@ import cors from 'cors';
 import 'dotenv/config';
 import { errorMiddleware } from './middlewares/errorMiddleware.js';
 import { roomRouter } from './routes/room.route.js';
+import { messageRouter } from './routes/message.route.js';
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3005;
 const app = express();
 
 app.use(express.json());
@@ -23,6 +24,7 @@ app.get('/', (req, res) => {
 });
 
 app.use(roomRouter);
+app.use(messageRouter);
 
 app.use(errorMiddleware);
 
