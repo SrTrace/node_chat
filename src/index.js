@@ -6,6 +6,10 @@ import 'dotenv/config';
 import { errorMiddleware } from './middlewares/errorMiddleware.js';
 import { roomRouter } from './routes/room.route.js';
 import { messageRouter } from './routes/message.route.js';
+import path from 'path';
+import { WebSocketServer } from 'ws';
+import { wsController } from './controllers/ws.controller.js';
+import { roomUsers } from './utils/roomUsers.js';
 
 const PORT = process.env.PORT || 3005;
 const app = express();
@@ -18,16 +22,43 @@ app.use(
     credentials: true,
   }),
 );
-
-app.get('/', (req, res) => {
-  res.send('Home page');
-});
+app.use(express.static(path.resolve('public')));
 
 app.use(roomRouter);
 app.use(messageRouter);
-
 app.use(errorMiddleware);
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
+});
+
+const wss = new WebSocketServer({ server });
+
+wss.on('connection', (ws, client) => {
+  ws.on('error', console.error);
+
+  ws.on('message', async (data) => {
+    await wsController.handleWebSocketMessage(ws, data, wss);
+  });
+
+  ws.on('close', () => {
+    roomUsers.userLeave(ws.userName, ws.roomName);
+
+    wsController.broadcastMessage(
+      JSON.stringify({
+        message: 'Ok',
+        data: {
+          id: '0',
+          userName: 'admin',
+          text: `${ws.userName} left chat`,
+          time: new Date().toISOString(),
+          roomName: ws.roomName,
+          roomUsers: roomUsers.getRoomUsers(ws.roomName),
+        },
+      }),
+      ws,
+      ws.roomName,
+      wss,
+    );
+  });
 });

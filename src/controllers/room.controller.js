@@ -1,25 +1,36 @@
 import { ApiError } from '../exceptions/api.error.js';
-import { Room } from '../models/Room.model.js';
+import { roomService } from '../services/room.service.js';
+import { messageController } from './message.controller.js';
 
 const getAllRooms = async (req, res) => {
-  const rooms = await Room.findAll();
+  const rooms = await roomService.findAllRooms();
 
   res.send(rooms.map(normolize));
 };
 
+const getRoomById = async (roomId) => {
+  if (isNaN(+roomId)) {
+    throw ApiError.BadRequest('Invalid room ID');
+  }
+
+  const existRoom = await roomService.findRoomById(+roomId);
+
+  if (!existRoom) {
+    throw ApiError.BadRequest('Room not exist');
+  }
+
+  return existRoom.name;
+};
+
 const createRoom = async (req, res) => {
   const { name } = req.body;
-  const existRoom = await Room.findOne({
-    where: { name },
-  });
+  const existRoom = await roomService.findRoomByName(name);
 
   if (existRoom) {
     throw ApiError.BadRequest('Room already exist');
   }
 
-  await Room.create({
-    name,
-  });
+  await roomService.createRoom(name);
 
   res.status(201).send(`${name} was created`);
 };
@@ -32,14 +43,13 @@ const renameRoom = async (req, res) => {
     throw ApiError.BadRequest('Invalid room ID');
   }
 
-  const existRoom = await Room.findByPk(+roomId);
+  const existRoom = await roomService.findRoomById(+roomId);
 
   if (!existRoom) {
     throw ApiError.BadRequest('This room not existed');
   }
 
-  existRoom.name = newName;
-  existRoom.save();
+  await roomService.updateRoomName(existRoom, newName);
 
   res.send(`Room was renamed to ${newName}`);
 };
@@ -51,15 +61,14 @@ const removeRoom = async (req, res) => {
     throw ApiError.BadRequest('Invalid room ID');
   }
 
-  const existRoom = await Room.findByPk(+roomId);
+  const existRoom = await roomService.findRoomById(+roomId);
 
   if (!existRoom) {
     throw ApiError.BadRequest('This room not existed');
   }
 
-  await Room.destroy({
-    where: { id: existRoom.id },
-  });
+  await messageController.deleteMessagesByRoomId(roomId);
+  await roomService.deleteRoom(roomId);
 
   res.send(`The ${existRoom.name} room successfully deleted`);
 };
@@ -73,4 +82,5 @@ export const roomController = {
   createRoom,
   renameRoom,
   removeRoom,
+  getRoomById,
 };

@@ -1,41 +1,45 @@
-import { Message } from '../models/Message.model.js';
-import { ChatUser } from '../models/ChatUser.model.js';
 import { ApiError } from '../exceptions/api.error.js';
+import { messageService } from '../services/message.service.js';
 
-const getAllMessagesByRoomID = async (req, res) => {
-  const { roomId } = req.params;
-
+const getAllMessagesByRoomID = async (roomId) => {
   if (isNaN(+roomId)) {
     throw ApiError.BadRequest('Invalid room ID');
   }
 
-  const messages = await Message.findAll({
-    where: { roomId },
-  });
+  const messages = await messageService.findMessagesByRoomId(roomId);
 
   const normalizedMessages = await Promise.all(
     messages.map(async (message) => {
-      const user = await ChatUser.findOne({
-        where: { id: message.userId },
-        attributes: ['username'],
-      });
+      const user = await messageService.findUserById(message.userId);
 
-      return normalizeMessage({
-        id: message.id,
-        userName: user ? user.username : 'anonymous',
-        text: message.text,
-        time: message.time,
-      });
+      return {
+        message: 'Ok',
+        data: normalizeMessage({
+          id: message.id,
+          userName: user ? user.username : 'anonymous',
+          text: message.text,
+          time: message.time,
+        }),
+      };
     }),
   );
 
-  res.send(normalizedMessages);
+  return normalizedMessages;
 };
 
-const createMessageByRoomId = async (req, res) => {
-  const { roomId } = req.params;
-  const { userName, text } = req.body;
+const deleteMessagesByRoomId = async (roomId) => {
+  if (isNaN(+roomId)) {
+    throw ApiError.BadRequest('Invalid room ID');
+  }
 
+  await messageService.deleteMessagesByRoomId(roomId);
+
+  return {
+    message: 'Message deleted successfully',
+  };
+};
+
+const createMessageByRoomId = async (roomId, userName, text) => {
   if (!userName || !text.trim()) {
     throw ApiError.BadRequest('All fields required');
   }
@@ -44,26 +48,18 @@ const createMessageByRoomId = async (req, res) => {
     throw ApiError.BadRequest('Invalid room ID');
   }
 
-  let existUser = await ChatUser.findOne({
-    where: { username: userName },
-  });
+  const user = await messageService.findOrCreateUserByName(userName);
+  const newMessage = await messageService.createMessage(roomId, user.id, text);
 
-  if (!existUser) {
-    existUser = await ChatUser.create({
-      username: userName,
-    });
-  }
-
-  const newMessage = await Message.create({
-    userId: existUser.id,
-    roomId,
-    text,
-  });
-
-  res.status(201).json({
+  return {
     message: 'Message created successfully',
-    data: newMessage,
-  });
+    data: normalizeMessage({
+      id: newMessage.id,
+      userName: user.username,
+      text: newMessage.text,
+      time: newMessage.time,
+    }),
+  };
 };
 
 function normalizeMessage({ id, userName, text, time }) {
@@ -81,4 +77,5 @@ function normalizeMessage({ id, userName, text, time }) {
 export const messageController = {
   getAllMessagesByRoomID,
   createMessageByRoomId,
+  deleteMessagesByRoomId,
 };
