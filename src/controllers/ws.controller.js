@@ -78,14 +78,12 @@ const handleWebSocketMessage = async (ws, data, wss) => {
           roomName,
           wss,
         );
-
         break;
 
       default:
-        console.log('Unknown message type:', messageData.type);
+        throw new Error('Unknown message type:', messageData.type);
     }
   } catch (error) {
-    console.error('Error handling WebSocket message:', error);
     ws.send(JSON.stringify({ error: error.message }));
   }
 };

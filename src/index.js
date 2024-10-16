@@ -29,13 +29,13 @@ app.use(messageRouter);
 app.use(errorMiddleware);
 
 const server = app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  process.stdout.write(`Server is running on http://localhost:${PORT}`);
 });
 
 const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws, client) => {
-  ws.on('error', console.error);
+  ws.on('error', process.stdout.write('wss error connection\n'));
 
   ws.on('message', async (data) => {
     await wsController.handleWebSocketMessage(ws, data, wss);
